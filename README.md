@@ -10,4 +10,6 @@ Current features:
 
 Planned features:
 
+* O365 licensing
+* Mimecast sync
 * Okta, GSuite, Atlassian user setup
