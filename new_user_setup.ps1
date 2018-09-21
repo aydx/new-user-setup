@@ -12,30 +12,34 @@ $samanageAuthToken = "" # get this from a config file
 
 # get ticket number for processing
 $incidentNumber = Read-Host "Please enter the new hire incident ID number, e.g. for https://help.dataxu.com/incidents/29015341-new-dataxu-fte-onboarding-form, enter 29015341"
-$ticketString = $apiAddr + "incidents/" + $incidentNumber + ".json?layout=long"
+$ticketString = $apiAddr + "incidents/" + $incidentNumber + ".xml?layout=long"
 
-# gets the ticket data - must have curl installed 
-$ticket = curl -H "X-Samanage-Authorization: Bearer $samanageAuthToken" $ticketString | ConvertFrom-Json
+# REST headers
+$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+$headers.Add("X-Samanage-Authorization","Bearer $samanageAuthToken")
+
+# gets the ticket data
+$ticket = Invoke-RestMethod -Uri $ticketString -Headers $headers
 
 # information for populating the AD user fields
-$name = $ticket.request_variables[$ticket.request_variables.name.IndexOf("New Hire Name")].value
+$name = $ticket.incident.request_variables.request_variable[$ticket.incident.request_variables.request_variable.name.IndexOf("New Hire Name")].value
 $nameSplit = $name.Split(' ')
 $firstName = $nameSplit[0]
 $lastName = $nameSplit[($nameSplit.Length - 1)]
-$title = $ticket.request_variables[$ticket.request_variables.name.IndexOf("New Hire Title")].value
+$title = $ticket.incident.request_variables.request_variable[$ticket.incident.request_variables.request_variable.name.IndexOf("New Hire Title")].value
 $description = $title
-$manager = $ticket.created_by.name
-$department = $ticket.department.name
-$office = $ticket.site.name
+$manager = Get-ADUser -Filter {Name -like $ticket.incident.created_by.name}
+$department = $ticket.incident.department.name
+$office = $ticket.incident.site.name
 $email = $firstName[0].ToString() + "$lastName" + "@dataxu.com" #first initial + last name
 $email = $email.ToLower()
 
 # need this to add correct security groups
-if ($ticket.name.Contains("FTE")) {
+if ($ticket.incident.name.Contains("FTE")) {
     $role = "FTE"
-} elseif ($ticket.name.Contains("Student")) {
+} elseif ($ticket.incident.name.Contains("Student")) {
     $role = "Student"
-} elseif ($ticket.name.Contains("Contractor")) {
+} elseif ($ticket.incident.name.Contains("Contractor")) {
     $role = "Contractor"
 } else {
     $role = ""
@@ -69,14 +73,13 @@ Write-Host ""
 $ans = Read-Host "Are you sure you want to continue? Enter Y/N"
 
 
-if ($ans = "Y" -or $ans = "y") {
+if ($ans -eq "Y" -or $ans -eq "y") {
     # connect to DX-UTILITY
     Write-Host "Connecting to DX-UTILITY."
     Enter-PSSession -ComputerName DX-UTILITY -Credential $credential
-    Import-Module ADDSAdministration # need this to make the user in AD
 
     # create the AD user
-    New-ADUser -Name $name -OtherAttributes @{'title' = $title; 'mail' = $email; 'description' = $description; 'manager' = $manager; 'office' = $office}
+    New-ADUser -Name $name -Title $title -EmailAddress $email -Manager $manager -Office $office
 
     # add user to default security groups
     foreach ($group in $defaultGroups) {
