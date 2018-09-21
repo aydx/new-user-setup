@@ -10,6 +10,7 @@ Current features:
 
 Planned features:
 
+* assign OU by office location & user role
 * O365 licensing
 * Mimecast sync
 * Okta, GSuite, Atlassian user setup
