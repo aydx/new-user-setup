@@ -1,5 +1,6 @@
 # new user setup script
 
+#test addition
 
 # get admin creds - nonadmins should never run this script
 $credential = Get-Credential
